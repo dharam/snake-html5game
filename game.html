@@ -4,13 +4,25 @@
 	<meta charset="UTF-8">
 	<title>Game</title>
 	<script src="game.js"></script>
+	<style>
+		canvas {
+			margin : auto;
+			display : block;
+			box-shadow : #111 0px 0px 10px;
+		}
+		h3,p {
+			text-align: center;
+			color : #ccc;			
+		}
+		body,canvas {
+			font-family: Arial;
+			background: url('bg-pattern.png') repeat;
+		}
+	</style>
 </head>
 <body>
-
-<input type="button" id="up" value="UP" />
-<input type="button" id="down" value="DOWN" />
-<input type="button" id="left" value="LEFT" />
-<input type="button" id="right" value="RIGHT" />
+<h3>Controls: W:Up | D:Right | S:Down | A:Left</h3> 
+<p>Help the little green snake find the eggs and watch it grow. Don't let it bite itself!</p>
 
 </body>
 </html>

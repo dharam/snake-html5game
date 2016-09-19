@@ -2,33 +2,53 @@
 	'use strict';
 
 	//Constants
+	const COMPONENT_WIDTH = 10;
+	const COMPONENT_HEIGHT = 10;
+
 	var GAME_COMPONENTS = [{
-		x 		: 10,
-		y 		: 120,
-		width 	: 30,
-		height 	: 30,
+		x 		: 3,
+		y 		: 4,
+		currentX: 3,
+		currentY: 4,
+		width 	: COMPONENT_WIDTH,
+		height 	: COMPONENT_HEIGHT,
 		type 	: 'snake',
-		color 	: 'black'
+		color 	: 'green',
+		direction : 1
 	},
 	{
-		x 		: 200,
-		y 		: 70,
-		width 	: 30,
-		height 	: 30,
+		x 		: 2,
+		y 		: 3,
+		width 	: COMPONENT_WIDTH,
+		height 	: COMPONENT_HEIGHT,
 		type 	: 'ball',
-		color 	: 'red'
-	}];	
+		color 	: 'white'
+	}];
 
-	var UPDATE_INTERVAL = 500; //1000ms/50fps
+	//Game Grid
+	var gameGrid = {
+		width : 50,
+		height : 50,
+		data : []
+	}
+
+	gameGrid.set = function (x, y) {
+		if (!gameGrid.data[x]) {
+			gameGrid.data[x] = [];
+		}
+		gameGrid.data[x][y] = gameObj.direction;
+	}
+
+	var UPDATE_INTERVAL = 60; //1000ms/50fps
 
 	var CANVAS = {
-		WIDTH : 480,
-		HEIGHT : 270
+		WIDTH : gameGrid.width * COMPONENT_WIDTH,
+		HEIGHT : gameGrid.height * COMPONENT_HEIGHT
 	};
 
 	var componentsArr = [];
 
-	//Helpers	
+	//Helpers
 	var gameIntervalClear = function () {
 		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 	}
@@ -42,15 +62,15 @@
 
 		document.body.insertBefore(this.canvas, document.body.childNodes[0]);
 		this.interval = setInterval(updateGameArea, UPDATE_INTERVAL);
-	} 
+	}
 
 	var gameStop = function () {
 		clearInterval(this.interval);
 	}
 
-	var updateComponents = function () {
+	var drawComponents = function () {
 		componentsArr.forEach( function (component) {
-			component.update();
+			component.draw();
 		});
 	}
 
@@ -59,67 +79,133 @@
 		componentsArr.forEach( function (component) {
 			component.move();
 		});
-		gameObj.update();
+		gameObj.draw();
 	}
 
-	var handleClick = function (e) {
-		if (!e || !e.target) {
+	var handleKeyPress = function (e) {
+		console.log(e);
+		if (!e || !e.key) {
 			return;
 		}
 
-		console.log(e);
-		var direction = e.target.getAttribute('value');
+		var direction = e.key;
 		var DIRECTION_CODES = {
-			'UP' : 2,
-			'RIGHT' : 1,
-			'LEFT' : -1,
-			'DOWN' : -2
+			'w' : 2,
+			'd' : 1,
+			'a' : -1,
+			's' : -2
 		};
 
-		gameObj.currentDirection = (DIRECTION_CODES[direction] !== (-1 * gameObj.currentDirection)) ? DIRECTION_CODES[direction] : gameObj.currentDirection;				
+		gameObj.direction = (DIRECTION_CODES[direction] !== (-1 * gameObj.direction)) ? DIRECTION_CODES[direction] : gameObj.direction;
 	}
 
 	var installGameListeners = function () {
-		var listenerElements = {
-			"up" : handleClick,
-			"down" : handleClick,
-			"left" : handleClick,
-			"right" : handleClick
-		};
-		
-		for (var i in listenerElements) {
-			if (listenerElements.hasOwnProperty(i)) {
-				document.getElementById(i).addEventListener('click', listenerElements[i]);
+		window.addEventListener('keypress', handleKeyPress);
+	}
+
+	var checkCollision = function (x, y) {
+		for (let i = 0; i < gameObj.path.length; i++) {
+			if (gameObj.path[i][0] === x && gameObj.path[i][1] === y) {
+				gameObj.status = 0;
+				gameObj.sounds.gameover.play();
+				return true;
 			}
-		}		
+		}
+
+		return false;
+	}
+
+	var foundFood = function (x, y) {
+		if (x === gameObj.ballInstance.x && y === gameObj.ballInstance.y) {
+			gameObj.ballInstance.changePosition();
+			return true;
+		}
+
+		return false;
 	}
 
 	//Game Object
 	var gameObj = {
-		canvas : document.createElement('canvas'),
-		start : gameStart,
-		clear : gameIntervalClear,
-		stop : gameStop,
-		update : updateComponents,
-		currentDirection : 1
-	}
+		canvas 		: document.createElement('canvas'),
+		start 		: gameStart,
+		clear 		: gameIntervalClear,
+		stop 		: gameStop,
+		draw 		: drawComponents,
+		path 		: [],
+		direction 	: 1,
+		length 		: 1,
+		checkCollision : checkCollision,
+		status		: 1,
+		foundFood	: foundFood,
+		sounds 		: {}
+	};
 
 	var gameComponents = {
 		init : function () {
-			//initialize the grid
-
 
 			//Initialize components
 			GAME_COMPONENTS.forEach(function (args) {
-				componentsArr.push(new Component(args));				
+				var instance;
+
+				instance = new Component(args);
+				if (args.type === 'ball') {
+					gameObj.ballInstance = instance;
+				} else if (args.type === 'snake') {
+					gameObj.snakeInstance = instance;
+				}
+				componentsArr.push(instance);
+			});
+
+			this.loadImages();
+			this.loadSounds();
+		},
+		images : [
+			{
+				type : 'background',
+				src  : 'bg-pattern.png',
+				repeat : 'repeat'
+			}
+		],
+		sounds : [
+			{	type: 'eat',
+				src : 'eat.mp3'
+			},
+			{	type: 'gameover',
+				src : 'gameover.mp3'
+			}
+		],
+		loadSounds : function () {
+			this.sounds.forEach( function (sound) {
+				gameObj.sounds[sound.type] = new gameComponents._sound(sound.src);
+			})
+		},
+		_sound : function (src) {
+		    this.sound = document.createElement("audio");
+		    this.sound.src = src;
+		    this.sound.setAttribute("preload", "auto");
+		    this.sound.setAttribute("controls", "none");
+		    this.sound.style.display = "none";
+		    document.body.appendChild(this.sound);
+		    this.play = function(){
+		        this.sound.play();
+		    }
+		    this.stop = function(){
+		        this.sound.pause();
+		    }
+		},
+		loadImages : function () {
+			this.images.forEach (function (image) {
+				if (image.type === 'background') {
+					//document.getElementsByTagName('canvas')[0].style.background = 'url("bg-pattern")';
+				}
 			});
 		}
 	};
 
-	//GAME LISTENERS	
+	//GAME LISTENERS
 	var gameListeners = {
 		init : installGameListeners
-	}	
+	}
 
 	//Constructors
 	function Component (options) {
@@ -133,46 +219,77 @@
 
 		this.color 	= options.color;
 		this.type	= options.type;
-	}
+		this.positionOnGrid();
 
-	Component.prototype.update = function () {
-		var ctx = gameObj.context;
-		ctx.fillStyle = this.color;
-		ctx.fillRect(this.x, this.y, this.width, this.height);
-	}
-
-	Component.prototype.move = function (direction) {
 		if (this.type === 'ball') {
+			this.changePosition = changePosition;
+		}
+	}
+
+	function changePosition () {
+		this.x = Math.floor(Math.random() * (gameGrid.width - 1)) + 1;
+		this.y = Math.floor(Math.random() * (gameGrid.height - 1)) + 1;
+	}
+
+	Component.prototype.positionOnGrid = function () {
+		gameGrid.set(this.x, this.y);
+	}
+
+	Component.prototype.draw = function () {
+		var ctx = gameObj.context;
+		var path;
+		ctx.fillStyle = this.color;
+		if (this.type === 'snake') {
+			for (let i = 0; i < gameObj.path.length; i++) {
+				path = gameObj.path[i];
+				ctx.fillRect(path[0] * this.width, path[1] * this.height, this.width, this.height);
+			}
+		} else if (this.type === 'ball') {
+			ctx.fillRect(this.x * this.width, this.y * this.height, this.width, this.height);
+		}
+	}
+
+	Component.prototype.move = function () {
+		if (this.type !== 'snake') {
 			return;
 		}
+		var direction = gameObj.direction;
 
-		if (Math.abs(gameObj.currentDirection) === 1) {
-			this.x += gameObj.currentDirection * 30;	
-		} else {
-			this.y += parseInt(gameObj.currentDirection / 2, 10) * -30;	
-		}		
-	}
+		if (direction === 1) {
+			this.x = (gameGrid.width - 1) > this.x ? ++this.x : 0;
+			this.y = this.y;
+		} else if (direction === -1){
+			this.x = this.x  > 0 ? --this.x : (gameGrid.width - 1);
+			this.y = this.y;
+		} else if (direction === -2) {
+			this.x = this.x;
+			this.y = (gameGrid.height - 1) > this.y ? ++this.y : 0;
+		} else if (direction === 2){
+			this.x = this.x;
+			this.y = this.y  > 0 ? --this.y : (gameGrid.height - 1);
+		}
 
-	//Game Grid
-	var gameGrid = {
-		width : 50,
-		height : 50		
-		init : initializeGameGrid,
-		data : []
-	}
+		if (gameObj.foundFood(this.x, this.y)) {
+			gameObj.sounds.eat.play();
+			gameObj.length++;
+		}
 
-	var initializeGameGrid = function () {
-		for (var i = 0; i < gameGrid.height; i++) {
-			for (var j = 0; j < gameGrid.width; j++) {
-				gameGrid.data[i][j] = 0;
+		if (!gameObj.checkCollision(this.x, this.y)) {
+			this.currentX = this.x;
+			this.currentY = this.y;
+			gameObj.path.push([this.currentX, this.currentY]);
+
+			if (gameObj.path.length > gameObj.length) {
+				gameObj.path.splice(0, (gameObj.path.length - gameObj.length));
 			}
+		} else {
+			gameObj.stop();
 		}
 	}
 
 	//main
-	
+
 	var init = function () {
-		gameGrid.init();		
 		gameComponents.init();
 		gameListeners.init();
 		gameObj.start();
